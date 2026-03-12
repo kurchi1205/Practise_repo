@@ -1,6 +1,9 @@
 from graph import graph
 
+async def main():
+    state = await graph.ainvoke({"question": "What is today's weather is SIngapore?"})
+    print(state["generated_answer"])
 
 if __name__ == "__main__":
-    state = graph.invoke({"question": "What should I prepare for interview?"})
-    print(state["generated_answer"])
+    import asyncio
+    asyncio.run(main())
