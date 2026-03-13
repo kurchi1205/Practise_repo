@@ -1,7 +1,7 @@
 from graph import graph
 
 async def main():
-    state = await graph.ainvoke({"question": "What is today's weather is SIngapore?"})
+    state = await graph.ainvoke({"question": "Tell about AON culture"})
     print(state["generated_answer"])
 
 if __name__ == "__main__":
