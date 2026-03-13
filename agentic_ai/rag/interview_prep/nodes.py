@@ -6,6 +6,8 @@ from metrics import (
 )
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from datetime import datetime
 from pydantic import BaseModel, Field
 from pymilvus.model.reranker import CrossEncoderRerankFunction
 
@@ -83,6 +85,24 @@ async def websearch(state):
     state["web_searched_content"] = result["messages"][-1].content
     return state
 
+def store_web_content(state):
+    web_content = state.get('web_searched_content')
+    if not web_content:
+        return {}
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = splitter.create_documents(
+        texts=[web_content],
+        metadatas=[{
+            "source": "websearch",
+            "question": state['question'],
+            "timestamp": datetime.utcnow().isoformat(),
+        }]
+    )
+    vectorstore = get_vector_store(embeddings)
+    vectorstore.add_documents(chunks)
+    print(f"Stored {len(chunks)} web content chunks into Milvus")
+    return {}
+
 embeddings = OllamaEmbeddings(model="mistral")
 URI = "./milvus_example.db"
 
@@ -139,7 +159,7 @@ def reranker(state):
             reranked_docs.append(web_doc)
         else:
             reranked_docs.append(docs[r.index])
-    state['retrieved_documents'] = reranked_docs
+    state['retrieved_documents'] = reranked_docs[:3]
     return state
 
 def auto_corrector(state):

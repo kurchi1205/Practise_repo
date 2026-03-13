@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 from state import question_answer
-from nodes import relevance_checker, retriever, reranker, ans_generator, websearch, auto_corrector, evaluator
+from nodes import relevance_checker, retriever, reranker, ans_generator, websearch, auto_corrector, evaluator, store_web_content
 
 def route_by_relevance(state: question_answer):
     if state['is_relevant'] == 'True':
@@ -23,6 +23,7 @@ workflow_builder.add_node("reranker", reranker)
 workflow_builder.add_node("auto_corrector", auto_corrector)
 workflow_builder.add_node("ans_generator", ans_generator)
 workflow_builder.add_node("websearch", websearch)
+workflow_builder.add_node("store_web_content", store_web_content)
 workflow_builder.add_node("evaluator", evaluator)
 
 workflow_builder.add_edge(START, "relevance_checker")
@@ -42,6 +43,8 @@ workflow_builder.add_conditional_edges("auto_corrector",
                                         }
                                     )
 workflow_builder.add_edge("websearch", "reranker")
+workflow_builder.add_edge("websearch", "store_web_content")
+workflow_builder.add_edge("store_web_content", END)
 workflow_builder.add_edge("reranker", "ans_generator")
 # workflow_builder.add_edge("ans_generator", "evaluator")
 workflow_builder.add_edge("ans_generator", END)
