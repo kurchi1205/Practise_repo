@@ -1,8 +1,10 @@
 import os
 from langchain_ollama import ChatOllama
 from metrics import (
-    context_relevance_metric, reranker_metric,
-    faithfulness_metric, completeness_metric, query_reformulation_metric,
+    routing_accuracy_metric,
+    context_relevance_metric,
+    reranker_effectiveness_metric, rank_improvement_metric,
+    faithfulness_metric, completeness_metric, answer_relevance_metric,
 )
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
@@ -141,6 +143,7 @@ def reranker(state):
     if not docs and not web_content:
         return state
 
+    state['pre_rerank_documents'] = list(docs)
     query = state['question']
 
     # Build unified passage list; track where web content sits
@@ -211,6 +214,15 @@ def evaluator(state):
     eval_llm = ChatOllama(model="llama3.2:3b", temperature=0, num_predict=200)
     scores = {}
 
+    # Routing accuracy — only when expected_route was provided
+    if state.get('expected_route'):
+        actual_route = "websearch" if state.get('web_searched_content') else "retriever"
+        r = routing_accuracy_metric.score(
+            expected_route=state['expected_route'],
+            actual_route=actual_route,
+        )
+        scores['routing_accuracy'] = r.value
+
     context = "\n".join(doc.page_content for doc in (state.get("retrieved_documents") or []))
     answer = state.get("generated_answer", "")
     docs = state.get("retrieved_documents") or []
@@ -222,9 +234,9 @@ def evaluator(state):
         )
         scores["context_relevance"] = r.value
 
-    # Reranker effectiveness — only when multiple docs were retrieved
+    # 3.1 — Reranker effectiveness (LLM judge)
     if len(docs) > 1:
-        r = reranker_metric.score(
+        r = reranker_effectiveness_metric.score(
             llm=eval_llm,
             question=state["question"],
             top_doc=docs[0].page_content,
@@ -232,14 +244,23 @@ def evaluator(state):
         )
         scores["reranker_effectiveness"] = r.value
 
-    # Answer faithfulness
+    # 3.2 — Rank improvement (deterministic)
+    pre_rerank = state.get("pre_rerank_documents") or []
+    if len(pre_rerank) > 1 and docs:
+        r = rank_improvement_metric.score(
+            pre_rerank_docs=pre_rerank,
+            post_rerank_docs=docs,
+        )
+        scores["rank_improvement"] = r.value
+
+    # 7.1 — Answer faithfulness
     if answer and context:
         r = faithfulness_metric.score(
             llm=eval_llm, question=state["question"], context=context, answer=answer
         )
         scores["answer_faithfulness"] = r.value
 
-    # Answer completeness — only when ground truth was provided
+    # 7.2 — Answer completeness (only when ground truth was provided)
     if answer and state.get("ground_truth"):
         r = completeness_metric.score(
             llm=eval_llm,
@@ -249,16 +270,12 @@ def evaluator(state):
         )
         scores["answer_completeness"] = r.value
 
-    # Query reformulation — only when auto_corrector fired
-    new_q = state.get("new_question")
-    if new_q and new_q != "no_question":
-        r = query_reformulation_metric.score(
-            llm=eval_llm,
-            question=state["question"],
-            new_question=new_q,
-            context=context,
+    # 7.3 — Answer relevance
+    if answer:
+        r = answer_relevance_metric.score(
+            llm=eval_llm, question=state["question"], answer=answer
         )
-        scores["query_reformulation_quality"] = r.value
+        scores["answer_relevance"] = r.value
 
     print("Scores:", scores)
     state["scores"] = scores
