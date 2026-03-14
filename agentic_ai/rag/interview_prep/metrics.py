@@ -6,7 +6,7 @@ def routing_accuracy_metric(expected_route: str, actual_route: str) -> str:
     return "pass" if expected_route.strip().lower() == actual_route.strip().lower() else "fail"
 
 @numeric_metric(name="context_relevance", allowed_values=(0.0, 1.0))
-def context_relevance_metric(question: str, context: str, llm=None) -> float:
+def context_relevance_metric(question: str, context: str, llm) -> float:
     prompt = f"""Score how relevant the retrieved context is for answering the question.
 - 1.0: fully covers the question with high detail
 - 0.7: mostly covers the question with minor gaps
@@ -26,7 +26,7 @@ Return only a float between 0.0 and 1.0. No explanation."""
 
 # 3.1 — Is the top doc after reranking the most relevant? (LLM judge)
 @discrete_metric(name="reranker_effectiveness", allowed_values=["pass", "fail"])
-def reranker_effectiveness_metric(question: str, top_doc: str, all_docs: str, llm=None) -> str:
+def reranker_effectiveness_metric(question: str, top_doc: str, all_docs: str, llm) -> str:
     prompt = f"""You are evaluating whether a cross-encoder reranker placed the best document first.
 
 Question: {question}
@@ -53,7 +53,7 @@ def rank_improvement_metric(pre_rerank_docs: list, post_rerank_docs: list) -> fl
 
 # 7.1 — Is the answer grounded in context with no hallucination?
 @discrete_metric(name="answer_faithfulness", allowed_values=["pass", "fail"])
-def faithfulness_metric(question: str, context: str, answer: str, llm=None) -> str:
+def faithfulness_metric(question: str, context: str, answer: str, llm) -> str:
     prompt = f"""You are evaluating whether a generated answer is grounded in the provided context.
 
 Question: {question}
@@ -68,7 +68,7 @@ Return only 'pass' if fully grounded, 'fail' if there is hallucination or invent
 
 # 7.2 — Does the answer cover all key points from ground truth?
 @discrete_metric(name="answer_completeness", allowed_values=["pass", "fail"])
-def completeness_metric(question: str, ground_truth: str, answer: str, llm=None) -> str:
+def completeness_metric(question: str, ground_truth: str, answer: str, llm) -> str:
     prompt = f"""You are evaluating whether a generated answer is complete.
 
 Question: {question}
@@ -83,7 +83,7 @@ Return only 'pass' if all key points are addressed, else 'fail'."""
 
 # 7.3 — How well does the answer address the question?
 @numeric_metric(name="answer_relevance", allowed_values=(0.0, 1.0))
-def answer_relevance_metric(question: str, answer: str, llm=None) -> float:
+def answer_relevance_metric(question: str, answer: str, llm) -> float:
     prompt = f"""Score how well the answer addresses the question asked.
 - 1.0: directly and fully answers the question
 - 0.7: mostly answers the question with minor off-topic content
