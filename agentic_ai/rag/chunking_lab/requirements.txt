@@ -1,0 +1,8 @@
+langchain-ollama
+langchain-milvus
+langchain-text-splitters
+langchain-community
+pymilvus
+pypdf
+datasets
+ragas
