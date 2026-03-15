@@ -1,6 +1,7 @@
 langchain-ollama
 langchain-milvus
 langchain-text-splitters
+langchain-experimental
 langchain-community
 pymilvus
 pypdf

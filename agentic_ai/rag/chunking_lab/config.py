@@ -14,9 +14,12 @@ TEST_QUESTIONS = [
     "What competencies does AON look for in candidates?",
 ]
 
-RETRIEVAL_K = 4
+RETRIEVAL_K = 2
 
 # Add more strategy names here as they are implemented in chunkers.py
 STRATEGIES_TO_RUN = [
     "fixed_medium",
+    "semantic_medium",
+    "markdown",
+    "hierarchical",
 ]

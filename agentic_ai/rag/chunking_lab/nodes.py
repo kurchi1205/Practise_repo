@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
 from langchain_milvus import Milvus
 from metrics import context_relevance_metric, faithfulness_metric, answer_relevance_metric
+from chunkers import _parent_map
 from config import LLM_MODEL, EMBEDDING_MODEL, MILVUS_URI, RETRIEVAL_K
 
 
@@ -23,13 +24,24 @@ def get_vector_store(collection_name: str):
 # ------------------------------------------------------------------
 def ingest_chunks(state: dict) -> dict:
     chunks = state["chunks"]
-    store = get_vector_store(state["strategy_name"])
-    docs = [
-        Document(page_content=c, metadata={"strategy": state["strategy_name"]})
-        for c in chunks
-    ]
+    strategy = state["strategy_name"]
+    store = get_vector_store(strategy)
+
+    # For hierarchical: store child chunk as page_content (what gets embedded),
+    # parent chunk in metadata (what gets returned at retrieval time).
+    if strategy == "hierarchical":
+        docs = [
+            Document(
+                page_content=c,
+                metadata={"strategy": strategy, "parent_content": _parent_map.get(c, c)},
+            )
+            for c in chunks
+        ]
+    else:
+        docs = [Document(page_content=c, metadata={"strategy": strategy}) for c in chunks]
+
     store.add_documents(docs)
-    print(f"[ingest] strategy={state['strategy_name']}  chunks={len(chunks)}")
+    print(f"[ingest] strategy={strategy}  chunks={len(chunks)}")
     return {
         **state,
         "num_chunks": len(chunks),
@@ -45,6 +57,18 @@ def retrieve(state: dict) -> dict:
     store = get_vector_store(state["strategy_name"])
     retriever = store.as_retriever(search_kwargs={"k": RETRIEVAL_K})
     docs = retriever.invoke(state["question"])
+
+    # For hierarchical: child chunks matched the query, but swap in the
+    # parent content so the LLM gets the broader context for generation.
+    if state["strategy_name"] == "hierarchical":
+        docs = [
+            Document(
+                page_content=d.metadata.get("parent_content", d.page_content),
+                metadata=d.metadata,
+            )
+            for d in docs
+        ]
+
     print(f"[retrieve] retrieved {len(docs)} docs")
     return {**state, "retrieved_docs": docs}
 
